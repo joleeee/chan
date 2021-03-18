@@ -302,7 +302,7 @@ void respond(int n)
 				fputs(message, fptr);
 				fputs("</pre>\n\n", fptr);
 
-				const char* o = "HTTP/1.0 303 See Other\nLocation: /\n\n";
+				const char* o = "HTTP/1.0 303 See Other\nLocation: .\n\n";
 				write(clients[n], o, strlen(o));
 			}
 		}
