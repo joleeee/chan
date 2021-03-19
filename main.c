@@ -285,23 +285,21 @@ void respond(int n)
 					line = strtok(NULL, "\r\n");
 				}
 
-				char rname[99999], rmessage[99999]; // these are kinda long, should limit %s
-				if (sscanf(last, "\nname=%[^&]&message=%s", rname, rmessage) == 2){
-					printf("name:%s, message:%s\n", rname, rmessage);
+				char rname[99999], rmessage[99999], rimg[99999]; // these are kinda long, should limit %s
+				if (sscanf(last, "\nname=%[^&]&message=%[^&]&img=%s", rname, rmessage, rimg) == 3){
+					printf("name:%s, message:%s img:%s\n", rname, rmessage, rimg);
 				}
-				else if(sscanf(last, "\nname=&message=%s", rmessage) == 1){
-					printf("message:%s\n", rmessage);
-					strncpy(rname, "anon", 4);
-				}
-				else
-					printf("ERROR decoding post req\n");
-
-				char name[99999], message[99999];
+				char name[99999], message[99999], img[99999];
 				urldecode(name, rname);
 				urldecode(message, rmessage);
+				urldecode(img, rimg);
+				if(strlen(name) == 0)
+					strncpy(name, "Anon\0", 5);
+				if(strlen(message) == 0)
+					strncpy(message, "~nomsg~\0", 8);
+				printf("name:%s, message:%s img:%s\n", name, message, img);
 
-				/*if(strcmp(name, "") == 0)*/
-					/*strncpy(name, "Anon\0", 5);*/
+
 
 				strcpy(path, ROOT);
 				strcpy(&path[strlen(ROOT)], reqline[1]);
@@ -309,7 +307,13 @@ void respond(int n)
 				FILE *fptr = fopen(path, "a");
 				fputs("<hr><em>", fptr);
 				fputs(name, fptr);
-				fputs("</em> says:\n<pre>", fptr);
+				fputs("</em> says:\n", fptr);
+				if(strlen(img) > 0){
+					fputs("<img src=\"", fptr);
+					fputs(img, fptr);
+					fputs("\" /><br>", fptr);
+				}
+				fputs("<pre>", fptr);
 				fputs(message, fptr);
 				fputs("</pre>\n\n", fptr);
 
