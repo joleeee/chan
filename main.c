@@ -189,10 +189,11 @@ void respond(int n)
 	{
 		/*printf("[\n%s]\n", mesg);*/
 		reqline[0] = strtok (mesg, " \t\n");
+		reqline[1] = strtok (NULL, " \t");
+		reqline[2] = strtok (NULL, " \t\n");
+		printf("[%s%s %s%s]", "\033[92m", reqline[0], reqline[1], "\033[0m");
 		if ( strncmp(reqline[0], "GET\0", 4)==0 )
 		{
-			reqline[1] = strtok (NULL, " \t");
-			reqline[2] = strtok (NULL, " \t\n");
 			if ( strncmp( reqline[2], "HTTP/1.0", 8)!=0 && strncmp( reqline[2], "HTTP/1.1", 8)!=0 )
 			{
 				write(clients[n], "HTTP/1.0 400 Bad Request\n", 25);
@@ -200,20 +201,22 @@ void respond(int n)
 			else
 			{
 				if ( strncmp(reqline[1], "/\0", 2)==0 )
-					reqline[1] = "/index.html";        //Because if no file is specified, index.html will be opened by default (like it happens in APACHE...
+					reqline[1] = "/index.html";
 
 				char* reqs[3];
 				int reql = 0;
-				if (strncmp(reqline[1], "/index.html", 11) == 0){
+				if (strlen(reqline[1]) >= strlen("/a.thread") && strncmp(&reqline[1][strlen(reqline[1])-strlen(".thread")], ".thread", strlen(".thread")) == 0) {
+					printf("thread\n");
 					char* preindex = "/preindex.html";
 					char* postindex = "/postindex.html";
-					//reqs = {preindex, "/data", postindex};
 					reqs[0] = preindex;
-					reqs[1] = "/data";
+					//reqs[1] = "/data";
+					reqs[1] = reqline[1];
 					reqs[2] = postindex;
 					reql = 3;
 				}
 				else{
+					printf("file\n");
 					reqs[0] = reqline[1];
 					reql = 1;
 				}
@@ -231,29 +234,29 @@ void respond(int n)
 				}
 
 				if(fof){
-					write(clients[n], "HTTP/1.0 404 Not Found\n", 23); //FILE NOT FOUND
+					write(clients[n], "HTTP/1.0 404 Not Found\n\n", 24); //FILE NOT FOUND
+					const char* fofdata = "<!DOCTYPE html><html><body>404</body></html>";
+					write(clients[n], fofdata, strlen(fofdata));
 				}
 				else{
 					write(clients[n], "HTTP/1.0 200 OK\n\n", 17);
-				}
-
-				// print all the files
-				for(int i = 0; i < reql; i++){
-					strcpy(path, ROOT);
-					strcpy(&path[strlen(ROOT)], reqs[i]);
-					if ( (fd=open(path, O_RDONLY))!=-1 )    //FILE FOUND
-					{
-						while ( (bytes_read=read(fd, data_to_send, BYTES))>0 )
-							write (clients[n], data_to_send, bytes_read);
+					// print all the files
+					for(int i = 0; i < reql; i++){
+						strcpy(path, ROOT);
+						strcpy(&path[strlen(ROOT)], reqs[i]);
+						if ( (fd=open(path, O_RDONLY))!=-1 )    //FILE FOUND
+						{
+							while ( (bytes_read=read(fd, data_to_send, BYTES))>0 )
+								write (clients[n], data_to_send, bytes_read);
+						}
 					}
 				}
+
 				printf("done\n");
 			}
 		}
 		if ( strncmp(reqline[0], "POST\0", 5)==0 ) {
 			printf("you got mail\n");
-			reqline[1] = strtok (NULL, " \t");
-			reqline[2] = strtok (NULL, " \t\n");
 
 			char proper[99999];
 			urldecode(proper, mesg3);
@@ -277,7 +280,7 @@ void respond(int n)
 				char *line, *last;
 				line = strtok(mesg2, "\r\n");
 				while(line != NULL){
-					printf("loop%s\n", line);
+					/*printf("loop%s\n", line);*/
 					last = line;
 					line = strtok(NULL, "\r\n");
 				}
@@ -286,24 +289,34 @@ void respond(int n)
 				if (sscanf(last, "\nname=%[^&]&message=%s", rname, rmessage) == 2){
 					printf("name:%s, message:%s\n", rname, rmessage);
 				}
+				else if(sscanf(last, "\nname=&message=%s", rmessage) == 1){
+					printf("message:%s\n", rmessage);
+					strncpy(rname, "anon", 4);
+				}
+				else
+					printf("ERROR decoding post req\n");
 
 				char name[99999], message[99999];
 				urldecode(name, rname);
 				urldecode(message, rmessage);
 
-				if(strcmp(name, "") == 0)
-					strncpy(name, "Anon\0", 5);
+				/*if(strcmp(name, "") == 0)*/
+					/*strncpy(name, "Anon\0", 5);*/
 
+				strcpy(path, ROOT);
+				strcpy(&path[strlen(ROOT)], reqline[1]);
 				// RACE CONDITION!!!! (me thinks)
-				FILE *fptr = fopen("data", "a");
+				FILE *fptr = fopen(path, "a");
 				fputs("<hr><em>", fptr);
 				fputs(name, fptr);
 				fputs("</em> says:\n<pre>", fptr);
 				fputs(message, fptr);
 				fputs("</pre>\n\n", fptr);
 
-				const char* o = "HTTP/1.0 303 See Other\nLocation: .\n\n";
+				const char* o = "HTTP/1.0 303 See Other\nLocation: ";
 				write(clients[n], o, strlen(o));
+				write(clients[n], reqline[1], strlen(reqline[1]));
+				write(clients[n], "\n\n", 2);
 			}
 		}
 	}
