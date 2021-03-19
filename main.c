@@ -307,7 +307,7 @@ void respond(int n)
 				FILE *fptr = fopen(path, "a");
 				fputs("<hr><em>", fptr);
 				fputs(name, fptr);
-				fputs("</em> says:\n", fptr);
+				fputs("</em> says:<br>\n", fptr);
 				if(strlen(img) > 0){
 					fputs("<img src=\"", fptr);
 					fputs(img, fptr);
