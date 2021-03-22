@@ -28,6 +28,7 @@ starts the server at port 10000 with ROOT as /home/shadyabhi
 #include<ctype.h>
 
 #define CONNMAX 1000
+// is this like packet size?
 #define BYTES 1024
 
 void urldecode(char *dst, const char *src)
@@ -122,6 +123,7 @@ int main(int argc, char* argv[])
 			}
 		}
 
+		// could this potentially get stuck? what if a small % of connections never close
 		while (clients[slot]!=-1) slot = (slot+1)%CONNMAX;
 	}
 
@@ -200,8 +202,8 @@ void respond(int n)
 			}
 			else
 			{
-				if ( strncmp(reqline[1], "/\0", 2)==0 )
-					reqline[1] = "/index.html";
+				/*if ( strncmp(reqline[1], "/\0", 2)==0 )*/
+					/*reqline[1] = "/index.html";*/
 
 				char* reqs[3];
 				int reql = 0;
@@ -214,6 +216,10 @@ void respond(int n)
 					reqs[1] = reqline[1];
 					reqs[2] = postindex;
 					reql = 3;
+				}
+				/*else if(strlen(reqline[1]) == strlen("/index.html") && strncmp(reqline[1], "/index.html", strlen("/index.html")) == 0){*/
+				else if(strncmp(reqline[1], "/\0", 2) == 0){
+					printf("index\n");
 				}
 				else{
 					printf("file\n");
@@ -286,41 +292,45 @@ void respond(int n)
 				}
 
 				char rname[99999], rmessage[99999], rimg[99999]; // these are kinda long, should limit %s
-				if (sscanf(last, "\nname=%[^&]&message=%[^&]&img=%s", rname, rmessage, rimg) == 3){
-					printf("name:%s, message:%s img:%s\n", rname, rmessage, rimg);
+				if (sscanf(last, "\nname%[^&]&message%[^&]&img%s", rname, rmessage, rimg) == 3){
+					printf("name:[%s], message:[%s] img:[%s]\n", rname, rmessage, rimg);
 				}
 				char name[99999], message[99999], img[99999];
-				urldecode(name, rname);
-				urldecode(message, rmessage);
-				urldecode(img, rimg);
+				urldecode(name, rname+1); // +1 to skip '='
+				urldecode(message, rmessage+1);
+				urldecode(img, rimg+1);
 				if(strlen(name) == 0)
 					strncpy(name, "Anon\0", 5);
-				if(strlen(message) == 0)
-					strncpy(message, "~nomsg~\0", 8);
 				printf("name:%s, message:%s img:%s\n", name, message, img);
-
-
-
-				strcpy(path, ROOT);
-				strcpy(&path[strlen(ROOT)], reqline[1]);
-				// RACE CONDITION!!!! (me thinks)
-				FILE *fptr = fopen(path, "a");
-				fputs("<hr><em>", fptr);
-				fputs(name, fptr);
-				fputs("</em> says:<br>\n", fptr);
-				if(strlen(img) > 0){
-					fputs("<img src=\"", fptr);
-					fputs(img, fptr);
-					fputs("\" /><br>", fptr);
+				/*strncpy(message, "~nomsg~\0", 8);*/
+				if(strlen(message) == 0){
+					write(clients[n], "HTTP/1.0 400 Bad Request\n\n", 26);
+					char* info = "You have to say something!\n";
+					write(clients[n], info, strlen(info));
 				}
-				fputs("<pre>", fptr);
-				fputs(message, fptr);
-				fputs("</pre>\n\n", fptr);
+				else
+				{
+					strcpy(path, ROOT);
+					strcpy(&path[strlen(ROOT)], reqline[1]);
+					// RACE CONDITION!!!! (me thinks)
+					FILE *fptr = fopen(path, "a");
+					fputs("<hr><em>", fptr);
+					fputs(name, fptr);
+					fputs("</em> says:<br>\n", fptr);
+					if(strlen(img) > 0){
+						fputs("<img src=\"", fptr);
+						fputs(img, fptr);
+						fputs("\" /><br>", fptr);
+					}
+					fputs("<pre>", fptr);
+					fputs(message, fptr);
+					fputs("</pre>\n\n", fptr);
 
-				const char* o = "HTTP/1.0 303 See Other\nLocation: ";
-				write(clients[n], o, strlen(o));
-				write(clients[n], reqline[1], strlen(reqline[1]));
-				write(clients[n], "\n\n", 2);
+					const char* o = "HTTP/1.0 303 See Other\nLocation: ";
+					write(clients[n], o, strlen(o));
+					write(clients[n], reqline[1], strlen(reqline[1]));
+					write(clients[n], "\n\n", 2);
+				}
 			}
 		}
 	}
