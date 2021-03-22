@@ -7,5 +7,8 @@ debug:
 release:
 	gcc -O2 main.c -o main
 
+run: default
+	./run &
+
 clean:
 	rm main
