@@ -26,6 +26,10 @@ starts the server at port 10000 with ROOT as /home/shadyabhi
 #include<signal.h>
 #include<fcntl.h>
 #include<ctype.h>
+#include<stdarg.h>
+#include<dirent.h>
+
+#define WRITE(client, string) write(client, string, strlen(string))
 
 #define CONNMAX 1000
 // is this like packet size?
@@ -168,6 +172,56 @@ void startServer(char *port)
 	}
 }
 
+void sendfile(int n, char *file){
+	char path[99999], data_to_send[BYTES];
+	int fd, bytes_read;
+	strcpy(path, ROOT);
+	strcpy(&path[strlen(ROOT)], file);
+	if ( (fd=open(path, O_RDONLY))!=-1 )    //FILE FOUND
+	{
+		while ( (bytes_read=read(fd, data_to_send, BYTES))>0 )
+			write (clients[n], data_to_send, bytes_read);
+	}
+
+}
+
+void sendfiles(int n, int argc, ...){
+	va_list valist, valist2;
+	va_start(valist, argc);
+	va_copy(valist2, valist);
+
+	// do all the files exist?
+	char path[99999], data_to_send[BYTES];
+	int fd, bytes_read;
+	for(int i = 0; i < argc; i++){
+		strcpy(path, ROOT);
+		strcpy(&path[strlen(ROOT)], va_arg(valist, char*));
+		if ( (fd=open(path, O_RDONLY))==-1 ){
+
+			WRITE(clients[n], "HTTP/1.0 404 Not Found\n\n"); //FILE NOT FOUND
+			WRITE(clients[n], "<!DOCTYPE html><html><body>404</body></html>");
+			return;
+		}
+	}
+
+	WRITE(clients[n], "HTTP/1.0 200 OK\n\n");
+	// print all the files
+	for(int i = 0; i < argc; i++){
+		strcpy(path, ROOT);
+		strcpy(&path[strlen(ROOT)], va_arg(valist2, char*));
+		if ( (fd=open(path, O_RDONLY))!=-1 )    //FILE FOUND
+		{
+			while ( (bytes_read=read(fd, data_to_send, BYTES))>0 )
+				write (clients[n], data_to_send, bytes_read);
+		}
+	}
+
+	va_end(valist);
+	va_end(valist2);
+}
+
+
+
 //client connection
 void respond(int n)
 {
@@ -189,7 +243,6 @@ void respond(int n)
 		fprintf(stderr,"Client disconnected upexpectedly.\n");
 	else    // message received
 	{
-		/*printf("[\n%s]\n", mesg);*/
 		reqline[0] = strtok (mesg, " \t\n");
 		reqline[1] = strtok (NULL, " \t");
 		reqline[2] = strtok (NULL, " \t\n");
@@ -198,71 +251,56 @@ void respond(int n)
 		{
 			if ( strncmp( reqline[2], "HTTP/1.0", 8)!=0 && strncmp( reqline[2], "HTTP/1.1", 8)!=0 )
 			{
-				write(clients[n], "HTTP/1.0 400 Bad Request\n", 25);
+				WRITE(clients[n], "HTTP/1.0 400 Bad Request\n");
 			}
 			else
 			{
-				/*if ( strncmp(reqline[1], "/\0", 2)==0 )*/
-					/*reqline[1] = "/index.html";*/
-
-				char* reqs[3];
-				int reql = 0;
 				if (strlen(reqline[1]) >= strlen("/a.thread") && strncmp(&reqline[1][strlen(reqline[1])-strlen(".thread")], ".thread", strlen(".thread")) == 0) {
-					printf("thread\n");
-					char* preindex = "/preindex.html";
-					char* postindex = "/postindex.html";
-					reqs[0] = preindex;
-					//reqs[1] = "/data";
-					reqs[1] = reqline[1];
-					reqs[2] = postindex;
-					reql = 3;
+					printf("info: thread\n");
+					sendfiles(n, 3,
+							"/preindex.html",
+							reqline[1],
+							"/postindex.html");
 				}
 				/*else if(strlen(reqline[1]) == strlen("/index.html") && strncmp(reqline[1], "/index.html", strlen("/index.html")) == 0){*/
 				else if(strncmp(reqline[1], "/\0", 2) == 0){
-					printf("index\n");
-				}
-				else{
-					printf("file\n");
-					reqs[0] = reqline[1];
-					reql = 1;
-				}
+					printf("info: index\n");
 
-				// do all the files exist?
-				int fof = 0;
-				for(int i = 0; i < reql; i++){
-					strcpy(path, ROOT);
-					strcpy(&path[strlen(ROOT)], reqs[i]);
-					if ( (fd=open(path, O_RDONLY))==-1 ){
-						fof=1;
-						printf("ERR 404d on local file %s!\n", path);
-						break;
-					}
-				}
+					WRITE(clients[n], "HTTP/1.0 200 OK\n\n"); //FILE NOT FOUND
 
-				if(fof){
-					write(clients[n], "HTTP/1.0 404 Not Found\n\n", 24); //FILE NOT FOUND
-					const char* fofdata = "<!DOCTYPE html><html><body>404</body></html>";
-					write(clients[n], fofdata, strlen(fofdata));
-				}
-				else{
-					write(clients[n], "HTTP/1.0 200 OK\n\n", 17);
-					// print all the files
-					for(int i = 0; i < reql; i++){
-						strcpy(path, ROOT);
-						strcpy(&path[strlen(ROOT)], reqs[i]);
-						if ( (fd=open(path, O_RDONLY))!=-1 )    //FILE FOUND
-						{
-							while ( (bytes_read=read(fd, data_to_send, BYTES))>0 )
-								write (clients[n], data_to_send, bytes_read);
+					sendfile(n, "/precatalog.html");
+
+					DIR *dir;
+					// ->d_type != DT_REG
+					if(dir = opendir(ROOT)){
+						struct dirent *files;
+						while((files=readdir(dir)) != NULL){
+							char *name = files->d_name;
+							if(strncmp(name, ".", 1) != 0 &&
+								strlen(name) >= strlen("a.thread") &&
+								strncmp(&name[strlen(name)-strlen(".thread")], ".thread", strlen(".thread")) == 0)
+									{
+								WRITE(clients[n], "<a href=\"");
+								WRITE(clients[n], files->d_name);
+								WRITE(clients[n], "\">");
+								WRITE(clients[n], files->d_name);
+								WRITE(clients[n], "</a><br>");
+							}
 						}
 					}
+					sendfile(n, "/postcatalog.html");
+				}
+				else{
+					printf("info: file\n");
+					sendfiles(n, 1, reqline[1]);
 				}
 
-				printf("done\n");
+
+				printf("info: done\n");
 			}
 		}
 		if ( strncmp(reqline[0], "POST\0", 5)==0 ) {
-			printf("you got mail\n");
+			printf("info: you got mail\n");
 
 			char proper[99999];
 			urldecode(proper, mesg3);
@@ -276,10 +314,9 @@ void respond(int n)
 
 			if( illegal || ( strncmp( reqline[2], "HTTP/1.0", 8)!=0 && strncmp( reqline[2], "HTTP/1.1", 8)!=0 ))
 			{
-				printf("Bad request!\n");
-				write(clients[n], "HTTP/1.0 400 Bad Request\n\n", 26);
-				char* info = "XSS is not permitted! >:)\n";
-				write(clients[n], info, strlen(info));
+				printf("info: Bad request!\n");
+				WRITE(clients[n], "HTTP/1.0 400 Bad Request\n\n");
+				WRITE(clients[n], "XSS is not permitted! >:)\n");
 			}
 			else
 			{
@@ -291,45 +328,75 @@ void respond(int n)
 					line = strtok(NULL, "\r\n");
 				}
 
-				char rname[99999], rmessage[99999], rimg[99999]; // these are kinda long, should limit %s
-				if (sscanf(last, "\nname%[^&]&message%[^&]&img%s", rname, rmessage, rimg) == 3){
-					printf("name:[%s], message:[%s] img:[%s]\n", rname, rmessage, rimg);
+				char rthread[99999], rname[99999], rmessage[99999], rimg[99999]; // these are kinda long, should limit %s
+				/*if (sscanf(last, "\nname%[^&]&message%[^&]&img%s", rname, rmessage, rimg) != 3){*/
+				int argc;
+				if ((argc = sscanf(last, "\nthread%[^&]&name%[^&]&message%[^&]&img%s", rthread, rname, rmessage, rimg)) == 4){
+					/*printf("warn: missing post args (4)\n");*/
 				}
-				char name[99999], message[99999], img[99999];
+				else if ((argc = sscanf(last, "\nname%[^&]&message%[^&]&img%s", rname, rmessage, rimg)) != 3){
+					printf("warn: missing post args (3)\n");
+					WRITE(clients[n], "HTTP/1.0 400 Bad Request\n\n");
+					WRITE(clients[n], ">:)\n");
+					shutdown (clients[n], SHUT_RDWR);         //All further send and recieve operations are DISABLED...
+					close(clients[n]);
+					clients[n]=-1;
+					return;
+				}
+				printf("argc %d\n", argc);
+				if(argc == 3){
+					strncpy(rthread, reqline[1], 100); //99999 would be proper..
+				}
+				char thread[99999], name[99999], message[99999], img[99999];
+				if(strlen(rthread) < 4){
+					printf("warn: too short");
+					WRITE(clients[n], "HTTP/1.0 400 Bad Request\n\n");
+					WRITE(clients[n], "Too short thread name, at least 4 required");
+					shutdown (clients[n], SHUT_RDWR);         //All further send and recieve operations are DISABLED...
+					close(clients[n]);
+					clients[n]=-1;
+					return;
+				}
+
+				urldecode(thread, rthread+1);
 				urldecode(name, rname+1); // +1 to skip '='
 				urldecode(message, rmessage+1);
 				urldecode(img, rimg+1);
+
 				if(strlen(name) == 0)
-					strncpy(name, "Anon\0", 5);
-				printf("name:%s, message:%s img:%s\n", name, message, img);
-				/*strncpy(message, "~nomsg~\0", 8);*/
+					strncpy(name, "Ola\0", 4);
+
+				if(strlen(thread) < strlen("a.thread") || strlen(thread) >= strlen("a.thread") && strncmp(&thread[strlen(thread)-strlen(".thread")], ".thread", strlen(".thread")) != 0){
+					printf("appending .thread\n");
+					strncpy(&thread[strlen(thread)], ".thread\0", 8);
+				}
+
+				printf("info: thread[%s] name:[%s], message:[%s] img:[%s]\n", thread, name, message, img);
 				if(strlen(message) == 0){
-					write(clients[n], "HTTP/1.0 400 Bad Request\n\n", 26);
-					char* info = "You have to say something!\n";
-					write(clients[n], info, strlen(info));
+					printf("warn: msg empty");
+					WRITE(clients[n], "HTTP/1.0 400 Bad Request\n\n");
+					WRITE(clients[n], "You have to say something!\n");
 				}
 				else
 				{
 					strcpy(path, ROOT);
-					strcpy(&path[strlen(ROOT)], reqline[1]);
-					// RACE CONDITION!!!! (me thinks)
-					FILE *fptr = fopen(path, "a");
-					fputs("<hr><em>", fptr);
-					fputs(name, fptr);
-					fputs("</em> says:<br>\n", fptr);
-					if(strlen(img) > 0){
-						fputs("<img src=\"", fptr);
-						fputs(img, fptr);
-						fputs("\" /><br>", fptr);
-					}
-					fputs("<pre>", fptr);
-					fputs(message, fptr);
-					fputs("</pre>\n\n", fptr);
+					strcpy(&path[strlen(ROOT)], "/\0");
+					strcpy(&path[strlen(ROOT)+1], thread);
 
-					const char* o = "HTTP/1.0 303 See Other\nLocation: ";
-					write(clients[n], o, strlen(o));
-					write(clients[n], reqline[1], strlen(reqline[1]));
-					write(clients[n], "\n\n", 2);
+					// RACE CONDITION!!!! (me thinks)
+					printf("appending to [%s]\n", path);
+					FILE *fptr = fopen(path, "a");
+					fprintf(fptr, "<hr><em>%s</em> sier:<br>", name);
+					if(strlen(img) > 0){
+						fprintf(fptr, "<a href=\"%s\"><img src=\"%s\" /></a><br>", img, img);
+					}
+					fprintf(fptr, "<pre>%s</pre>\n\n", message);
+
+					WRITE(clients[n], "HTTP/1.0 303 See Other\nLocation: ");
+					WRITE(clients[n], reqline[1]);
+					WRITE(clients[n], "\n\n");
+
+					printf("info: Redirecting to %s\n", reqline[1]);
 				}
 			}
 		}
