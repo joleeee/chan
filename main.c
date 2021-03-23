@@ -393,7 +393,7 @@ void respond(int n)
 					fprintf(fptr, "<pre>%s</pre>\n\n", message);
 
 					WRITE(clients[n], "HTTP/1.0 303 See Other\nLocation: ");
-					WRITE(clients[n], reqline[1]);
+					WRITE(clients[n], &reqline[1][1]);
 					WRITE(clients[n], "\n\n");
 
 					printf("info: Redirecting to %s\n", reqline[1]);
