@@ -1,0 +1,25 @@
+img{
+	max-height: 384px;
+	max-width: 384px;
+}
+body{
+	background-color: #ffe;
+}
+.post{
+	background-color: #f0e0d6;
+	border: 2px solid #d9bfb7;
+	padding: 4px 24px 4px 6px;
+	display: table;
+}
+pre{
+	padding-left: 24px;
+	color: maroon;
+}
+.author{
+	color: rgb(17, 119, 67);
+	font-weight: bold;
+}
+.titlebar{
+	background-color: #f0e8e3;
+	padding: 1px 6px 1px 6px;
+}
