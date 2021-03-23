@@ -28,6 +28,7 @@ starts the server at port 10000 with ROOT as /home/shadyabhi
 #include<ctype.h>
 #include<stdarg.h>
 #include<dirent.h>
+#include<time.h>
 
 #define WRITE(client, string) write(client, string, strlen(string))
 
@@ -243,10 +244,10 @@ void respond(int n)
 		fprintf(stderr,"Client disconnected upexpectedly.\n");
 	else    // message received
 	{
-		reqline[0] = strtok (mesg, " \t\n");
-		reqline[1] = strtok (NULL, " \t");
-		reqline[2] = strtok (NULL, " \t\n");
-		printf("[%s%s %s%s]", "\033[92m", reqline[0], reqline[1], "\033[0m");
+		reqline[0] = strtok (mesg, " \t\n");	// "GET"
+		reqline[1] = strtok (NULL, " \t");	// "/data.thread"
+		reqline[2] = strtok (NULL, " \t\n");	// "HTTP/1.1"
+		printf("[%s%s %s%s]\n", "\033[92m", reqline[0], reqline[1], "\033[0m");
 		if ( strncmp(reqline[0], "GET\0", 4)==0 )
 		{
 			if ( strncmp( reqline[2], "HTTP/1.0", 8)!=0 && strncmp( reqline[2], "HTTP/1.1", 8)!=0 )
@@ -294,9 +295,6 @@ void respond(int n)
 					printf("info: file\n");
 					sendfiles(n, 1, reqline[1]);
 				}
-
-
-				printf("info: done\n");
 			}
 		}
 		if ( strncmp(reqline[0], "POST\0", 5)==0 ) {
@@ -379,6 +377,19 @@ void respond(int n)
 				}
 				else
 				{
+					time_t rawtime;
+					struct tm *timeinfo;
+					time(&rawtime);
+					timeinfo=gmtime(&rawtime);
+					char timed[10000];
+					sprintf(timed, "%04d-%02d-%02d %02d:%02d:%02d UTC",
+							timeinfo->tm_year+1900,
+							timeinfo->tm_mon+1,
+							timeinfo->tm_mday,
+							timeinfo->tm_hour,
+							timeinfo->tm_min,
+							timeinfo->tm_sec);
+
 					strcpy(path, ROOT);
 					strcpy(&path[strlen(ROOT)], "/\0");
 					strcpy(&path[strlen(ROOT)+1], thread);
@@ -386,11 +397,11 @@ void respond(int n)
 					// RACE CONDITION!!!! (me thinks)
 					printf("appending to [%s]\n", path);
 					FILE *fptr = fopen(path, "a");
-					fprintf(fptr, "<hr><em>%s</em> sier:<br>", name);
+					fprintf(fptr, "<hr><div class=\"post\"><span class=\"titlebar\"><span class=\"author\">%s</span> <time class=\"posttime\">%s</time></span><br>", name, timed);
 					if(strlen(img) > 0){
 						fprintf(fptr, "<a href=\"%s\"><img src=\"%s\" /></a><br>", img, img);
 					}
-					fprintf(fptr, "<pre>%s</pre>\n\n", message);
+					fprintf(fptr, "<pre class=\"postcontent\">%s</pre></div>\n\n", message);
 
 					WRITE(clients[n], "HTTP/1.0 303 See Other\nLocation: ");
 					WRITE(clients[n], &reqline[1][1]);
