@@ -263,11 +263,10 @@ void respond(int n)
 							reqline[1],
 							"/postindex.html");
 				}
-				/*else if(strlen(reqline[1]) == strlen("/index.html") && strncmp(reqline[1], "/index.html", strlen("/index.html")) == 0){*/
 				else if(strncmp(reqline[1], "/\0", 2) == 0){
 					printf("info: index\n");
 
-					WRITE(clients[n], "HTTP/1.0 200 OK\n\n"); //FILE NOT FOUND
+					WRITE(clients[n], "HTTP/1.0 200 OK\n\n");
 
 					sendfile(n, "/precatalog.html");
 
@@ -279,11 +278,19 @@ void respond(int n)
 							char *name = files->d_name;
 							if(strncmp(name, ".", 1) != 0 &&
 								strlen(name) >= strlen("a.thread") &&
-								strncmp(&name[strlen(name)-strlen(".thread")], ".thread", strlen(".thread")) == 0)
-									{
+								strncmp(&name[strlen(name)-strlen(".thread")], ".thread", strlen(".thread")) == 0){
+
+								struct stat attrib;
+								// TODO NEED TO PREPEND ROOT
+								stat(files->d_name, &attrib);
+								char date[20];
+								strftime(date, 20, "%m-%d %H:%M", gmtime(&(attrib.st_ctime)));
+
 								WRITE(clients[n], "<a href=\"");
 								WRITE(clients[n], files->d_name);
 								WRITE(clients[n], "\">");
+								WRITE(clients[n], date);
+								WRITE(clients[n], " ");
 								WRITE(clients[n], files->d_name);
 								WRITE(clients[n], "</a><br>");
 							}
