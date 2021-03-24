@@ -305,7 +305,7 @@ void respond(int n)
 
 			int illegal = 0;
 			for(size_t i = 0; i < 99999; i++)
-				if(proper[i] == '<' || proper[i] == '>'){
+				if(proper[i] == '<'){
 					illegal = 1;
 					break;
 				}
@@ -401,7 +401,20 @@ void respond(int n)
 					if(strlen(img) > 0){
 						fprintf(fptr, "<a href=\"%s\"><img src=\"%s\" /></a><br>", img, img);
 					}
-					fprintf(fptr, "<pre class=\"postcontent\">%s</pre></div>\n\n", message);
+					fprintf(fptr, "<div class=\"postcontent\">");
+					char *token = strtok(message, "\n");
+					while(token != NULL){
+						// remove leading whitespace
+						while(*token == ' ')
+							token++;
+						int green = *token == '>';
+						fprintf(fptr, "%s%s%s<br>",
+								green?"<span class=\"greentext\">":"",
+								token,
+								green?"</span>":"");
+						token = strtok(NULL, "\n");
+					}
+					fprintf(fptr, "</div></div>\n\n");
 
 					WRITE(clients[n], "HTTP/1.0 303 See Other\nLocation: ");
 					WRITE(clients[n], &reqline[1][1]);

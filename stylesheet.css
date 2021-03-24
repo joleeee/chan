@@ -4,6 +4,7 @@ img{
 }
 body{
 	background-color: #ffe;
+	font-family: arial,helvetica,sans-serif
 }
 .post{
 	background-color: #f0e0d6;
@@ -11,9 +12,13 @@ body{
 	padding: 4px 24px 4px 6px;
 	display: table;
 }
-pre{
+.postcontent{
 	padding-left: 24px;
+	padding-top: 8px;
 	color: maroon;
+}
+.greentext{
+	color: green;
 }
 .author{
 	color: rgb(17, 119, 67);
