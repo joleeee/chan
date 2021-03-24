@@ -17,6 +17,6 @@ function localize(){
 	for (var i=0, max=all.length; i < max; i++) {
 	  var o = all[i].innerHTML.replace(/-/g, "/")
 	  var t = new Date(o);
-	  all[i].innerHTML=t.today() + " " + t.timeNow() + " <small>(" + Intl.DateTimeFormat().resolvedOptions().timeZone + "</small>)";
+	  all[i].innerHTML=t.today() + " " + t.timeNow() + " <small>(" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")</small>";
 	}
 }
