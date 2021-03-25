@@ -36,6 +36,8 @@ starts the server at port 10000 with ROOT as /home/shadyabhi
 // is this like packet size?
 #define BYTES 1024
 
+#define STRLEN 99999
+
 void urldecode(char *dst, const char *src)
 {
         char a, b;
@@ -174,7 +176,7 @@ void startServer(char *port)
 }
 
 void sendfile(int n, char *file){
-	char path[99999], data_to_send[BYTES];
+	char path[STRLEN], data_to_send[BYTES];
 	int fd, bytes_read;
 	strcpy(path, ROOT);
 	strcpy(&path[strlen(ROOT)], file);
@@ -192,7 +194,7 @@ void sendfiles(int n, int argc, ...){
 	va_copy(valist2, valist);
 
 	// do all the files exist?
-	char path[99999], data_to_send[BYTES];
+	char path[STRLEN], data_to_send[BYTES];
 	int fd, bytes_read;
 	for(int i = 0; i < argc; i++){
 		strcpy(path, ROOT);
@@ -226,17 +228,17 @@ void sendfiles(int n, int argc, ...){
 //client connection
 void respond(int n)
 {
-	char mesg[99999], *reqline[3], data_to_send[BYTES], path[99999];
+	char mesg[STRLEN], *reqline[3], data_to_send[BYTES], path[STRLEN];
 	int rcvd, fd, bytes_read;
 
-	memset( (void*)mesg, (int)'\0', 99999 );
+	memset( (void*)mesg, (int)'\0', STRLEN );
 
-	rcvd=recv(clients[n], mesg, 99999, 0);
+	rcvd=recv(clients[n], mesg, STRLEN, 0);
 
-	char mesg2[99999];
-	memcpy(mesg2, mesg, 99999);
-	char mesg3[99999];
-	memcpy(mesg3, mesg, 99999);
+	char mesg2[STRLEN];
+	memcpy(mesg2, mesg, STRLEN);
+	char mesg3[STRLEN];
+	memcpy(mesg3, mesg, STRLEN);
 
 	if (rcvd<0)    // receive error
 		fprintf(stderr,("recv() error\n"));
@@ -307,11 +309,11 @@ void respond(int n)
 		if ( strncmp(reqline[0], "POST\0", 5)==0 ) {
 			printf("info: you got mail\n");
 
-			char proper[99999];
+			char proper[STRLEN];
 			urldecode(proper, mesg3);
 
 			int illegal = 0;
-			for(size_t i = 0; i < 99999; i++)
+			for(size_t i = 0; i < STRLEN; i++)
 				if(proper[i] == '<'){
 					illegal = 1;
 					break;
@@ -333,7 +335,7 @@ void respond(int n)
 					line = strtok(NULL, "\r\n");
 				}
 
-				char rthread[99999], rname[99999], rmessage[99999], rimg[99999]; // these are kinda long, should limit %s
+				char rthread[STRLEN], rname[STRLEN], rmessage[STRLEN], rimg[STRLEN]; // these are kinda long, should limit %s
 				/*if (sscanf(last, "\nname%[^&]&message%[^&]&img%s", rname, rmessage, rimg) != 3){*/
 				int argc;
 				if ((argc = sscanf(last, "\nthread%[^&]&name%[^&]&message%[^&]&img%s", rthread, rname, rmessage, rimg)) == 4){
@@ -350,9 +352,9 @@ void respond(int n)
 				}
 				printf("argc %d\n", argc);
 				if(argc == 3){
-					strncpy(rthread, reqline[1], 100); //99999 would be proper..
+					strncpy(rthread, reqline[1], 100); // max 100 long name
 				}
-				char thread[99999], name[99999], message[99999], img[99999];
+				char thread[STRLEN], name[STRLEN], message[STRLEN], img[STRLEN];
 				if(strlen(rthread) < 4){
 					printf("warn: too short");
 					WRITE(clients[n], "HTTP/1.0 400 Bad Request\n\n");
