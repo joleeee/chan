@@ -223,7 +223,94 @@ void sendfiles(int n, int argc, ...){
 	va_end(valist2);
 }
 
+// http://www.cse.yorku.ca/~oz/hash.html
+const unsigned long hash(const unsigned char *str)
+{
+    unsigned long hash = 5381;
+    int c;
 
+    while (c = *str++)
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+
+    return hash;
+}
+
+#define HASH_THREAD 6954056392669
+#define HASH_NAME 6385503302
+#define HASH_MESSAGE 229474704965354
+#define HASH_IMG 193495042
+
+struct POSTR{
+	char *thread, *message, *name, *img;
+};
+
+#define FREE_POSTR(postr)		\
+	if(postr.thread)		\
+		free(postr.thread);	\
+	if(postr.message)		\
+		free(postr.message);	\
+	if(postr.name)			\
+		free(postr.name);	\
+	if(postr.img)			\
+		free(postr.img);
+
+#define ALLOCATE_POSTR_STRING(ptr, val)			\
+if(ptr)							\
+	free(ptr);					\
+ptr = (char *)malloc(sizeof(char) * (strlen(val)+1));	\
+strcpy(ptr, val);
+
+void getpostreqs(char *msg, struct POSTR *postreq){
+	printf("keys\n");
+	printf("%s\n", msg);
+	char *a = msg;
+	char *b;
+	/*char *b = strtok(NULL, "&");*/
+	while(1){
+		char *key, *value=NULL;
+		b=a;
+		while(*b != '=' && *b != '\0')
+			b++;
+		if(*b == '\0') // we hit end of file while looking for key, so missing value, just return!
+			break;
+		*b='\0';
+		key=a;
+		a=b+1;
+
+		if(*a != '\0'){ // if we don't start at the end then find it
+			b=a;
+			while(*b != '&' && *b != '\0')
+				b++;
+			*b='\0';
+			value=a;
+			a=b+1;
+		}
+
+		char empty[1] = "";
+		if(!value){ // if we are at the end then set it to emptystring
+			value=empty;
+		}
+
+		printf("(%s):(%s)\n", key, value);
+		switch(hash(key)){
+			case HASH_THREAD:
+				ALLOCATE_POSTR_STRING(postreq->thread, value);
+				break;
+			case HASH_MESSAGE:
+				ALLOCATE_POSTR_STRING(postreq->message, value);
+				break;
+			case HASH_NAME:
+				ALLOCATE_POSTR_STRING(postreq->name, value);
+				break;
+			case HASH_IMG:
+				ALLOCATE_POSTR_STRING(postreq->img, value);
+				break;
+			default:
+				printf("err %s = %ld not recognized\n", key, hash(key));
+				break;
+		}
+	}
+}
 
 //client connection
 void respond(int n)
@@ -335,14 +422,13 @@ void respond(int n)
 					line = strtok(NULL, "\r\n");
 				}
 
-				char rthread[STRLEN], rname[STRLEN], rmessage[STRLEN], rimg[STRLEN]; // these are kinda long, should limit %s
-				/*if (sscanf(last, "\nname%[^&]&message%[^&]&img%s", rname, rmessage, rimg) != 3){*/
-				int argc;
-				if ((argc = sscanf(last, "\nthread%[^&]&name%[^&]&message%[^&]&img%s", rthread, rname, rmessage, rimg)) == 4){
-					/*printf("warn: missing post args (4)\n");*/
-				}
-				else if ((argc = sscanf(last, "\nname%[^&]&message%[^&]&img%s", rname, rmessage, rimg)) != 3){
-					printf("warn: missing post args (3)\n");
+				char bigdump[STRLEN];
+				urldecode(bigdump, last);
+				struct POSTR postreq = {NULL};
+				getpostreqs(bigdump, &postreq);
+				printf("info: thread[%s] name:[%s], message:[%s] img:[%s]\n", postreq.thread, postreq.name, postreq.message, postreq.img);
+				if(!postreq.message || !postreq.name || !postreq.img){
+					printf("warn: missing post args, message, name and img required\n");
 					WRITE(clients[n], "HTTP/1.0 400 Bad Request\n\n");
 					WRITE(clients[n], ">:)\n");
 					shutdown (clients[n], SHUT_RDWR);         //All further send and recieve operations are DISABLED...
@@ -350,36 +436,36 @@ void respond(int n)
 					clients[n]=-1;
 					return;
 				}
-				printf("argc %d\n", argc);
-				if(argc == 3){
-					strncpy(rthread, reqline[1], 100); // max 100 long name
+				if(!postreq.thread){
+					char reqline1raw[100], reqline1[100];
+					strncpy(reqline1raw, &reqline[1][1], 100);
+					urldecode(reqline1, reqline1raw);
+					ALLOCATE_POSTR_STRING(postreq.thread, reqline1);
+					printf("warn: no thread name, set to %s\n", postreq.thread);
 				}
-				char thread[STRLEN], name[STRLEN], message[STRLEN], img[STRLEN];
-				if(strlen(rthread) < 4){
+
+				if(strlen(postreq.thread) < 4){
 					printf("warn: too short");
 					WRITE(clients[n], "HTTP/1.0 400 Bad Request\n\n");
-					WRITE(clients[n], "Too short thread name, at least 4 required");
+					WRITE(clients[n], "Too short thread name, at least 4 characters required");
 					shutdown (clients[n], SHUT_RDWR);         //All further send and recieve operations are DISABLED...
 					close(clients[n]);
 					clients[n]=-1;
 					return;
 				}
 
-				urldecode(thread, rthread+1);
-				urldecode(name, rname+1); // +1 to skip '='
-				urldecode(message, rmessage+1);
-				urldecode(img, rimg+1);
+				// now postreq.* are all set to at least ""
 
-				if(strlen(name) == 0)
-					strncpy(name, "Ola\0", 4);
-
-				if(strlen(thread) < strlen("a.thread") || strlen(thread) >= strlen("a.thread") && strncmp(&thread[strlen(thread)-strlen(".thread")], ".thread", strlen(".thread")) != 0){
-					printf("appending .thread\n");
-					strncpy(&thread[strlen(thread)], ".thread\0", 8);
+				if(strlen(postreq.name) < 1){
+					ALLOCATE_POSTR_STRING(postreq.name, "Ola");
 				}
 
-				printf("info: thread[%s] name:[%s], message:[%s] img:[%s]\n", thread, name, message, img);
-				if(strlen(message) == 0){
+				if(strlen(postreq.thread) < strlen("a.thread") || strlen(postreq.thread) >= strlen("a.thread") && strncmp(&postreq.thread[strlen(postreq.thread)-strlen(".thread")], ".thread", strlen(".thread")) != 0){
+					printf("appending .thread\n");
+					strncpy(&postreq.thread[strlen(postreq.thread)], ".thread\0", 8);
+				}
+
+				if(strlen(postreq.message) == 0){
 					printf("warn: msg empty");
 					WRITE(clients[n], "HTTP/1.0 400 Bad Request\n\n");
 					WRITE(clients[n], "You have to say something!\n");
@@ -401,17 +487,21 @@ void respond(int n)
 
 					strcpy(path, ROOT);
 					strcpy(&path[strlen(ROOT)], "/\0");
-					strcpy(&path[strlen(ROOT)+1], thread);
+					strcpy(&path[strlen(ROOT)+1], postreq.thread);
 
 					// RACE CONDITION!!!! (me thinks)
 					printf("appending to [%s]\n", path);
 					FILE *fptr = fopen(path, "a");
-					fprintf(fptr, "<hr><div class=\"post\"><span class=\"titlebar\"><span class=\"author\">%s</span> <time class=\"posttime\">%s</time></span><br>", name, timed);
-					if(strlen(img) > 0){
-						fprintf(fptr, "<a href=\"%s\"><img src=\"%s\" /></a><br>", img, img);
+					fprintf(fptr, "<hr><div class=\"post\"><span class=\"titlebar\"><span class=\"author\">%s</span> <time class=\"posttime\">%s</time></span><br>", postreq.name, timed);
+					printf("1all good\n");
+					if(postreq.img && strlen(postreq.img) > 1){
+						fprintf(fptr, "<a href=\"%s\"><img src=\"%s\" /></a><br>", postreq.img, postreq.img);
 					}
+					printf("2all good\n");
 					fprintf(fptr, "<div class=\"postcontent\">");
-					char *token = strtok(message, "\n");
+					printf("3all good\n");
+					char *token = strtok(postreq.message, "\n");
+					printf("4all good\n");
 					while(token != NULL){
 						// remove leading whitespace
 						while(*token == ' ')
@@ -424,6 +514,8 @@ void respond(int n)
 						token = strtok(NULL, "\n");
 					}
 					fprintf(fptr, "</div></div>\n\n");
+					printf("closed file\n");
+					fclose(fptr);
 
 					WRITE(clients[n], "HTTP/1.0 303 See Other\nLocation: ");
 					WRITE(clients[n], &reqline[1][1]);
@@ -431,6 +523,8 @@ void respond(int n)
 
 					printf("info: Redirecting to %s\n", reqline[1]);
 				}
+
+				FREE_POSTR(postreq);
 			}
 		}
 	}
