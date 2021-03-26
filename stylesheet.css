@@ -20,6 +20,9 @@ body{
 .greentext{
 	color: green;
 }
+.pinktext{
+	color: #ca0bca;
+}
 .author{
 	color: rgb(17, 119, 67);
 	font-weight: bold;

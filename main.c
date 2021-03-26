@@ -528,10 +528,11 @@ void respond(int n)
 						while(*token == ' ')
 							token++;
 						int green = strncmp(token, "&gt;", 4) == 0;
+						int pink = strncmp(token, "&lt;", 4) == 0;
 						fprintf(fptr, "%s%s%s<br>",
-								green?"<span class=\"greentext\">":"",
+								(pink||green)?green?"<span class=\"greentext\">":"<span class=\"pinktext\">":"",
 								token,
-								green?"</span>":"");
+								(pink||green)?"</span>":"");
 						token = strtok(NULL, "\n");
 					}
 					fprintf(fptr, "</div></div>\n\n");
