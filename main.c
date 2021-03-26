@@ -38,6 +38,35 @@ starts the server at port 10000 with ROOT as /home/shadyabhi
 
 #define STRLEN 99999
 
+// https://www.geeksforgeeks.org/c-program-replace-word-text-another-given-word/
+char *escape(char *str, char *find, char *rep){
+	char *result;
+	int i, cnt=0;
+	int findlen = strlen(find);
+	int replen = strlen(rep);
+	for(i=0; str[i] != '\0'; i++){
+		if(strstr(&str[i], find) == &str[i]){
+			cnt++;
+			i += findlen-1;
+		}
+	}
+
+	result = (char*)malloc(i + cnt*(replen-findlen) + 1);
+
+	i=0;
+	while(*str){
+		if(strstr(str, find) == str){
+			strcpy(&result[i], rep);
+			i+=replen;
+			str+=findlen;
+		}
+		else
+			result[i++]=*str++;
+	}
+	result[i] = '\0';
+	return result;
+}
+
 void urldecode(char *dst, const char *src)
 {
         char a, b;
@@ -261,8 +290,6 @@ ptr = (char *)malloc(sizeof(char) * (strlen(val)+1));	\
 strcpy(ptr, val);
 
 void getpostreqs(char *msg, struct POSTR *postreq){
-	printf("keys\n");
-	printf("%s\n", msg);
 	char *a = msg;
 	char *b;
 	/*char *b = strtok(NULL, "&");*/
@@ -291,13 +318,21 @@ void getpostreqs(char *msg, struct POSTR *postreq){
 			value=empty;
 		}
 
-		printf("(%s):(%s)\n", key, value);
 		switch(hash(key)){
 			case HASH_THREAD:
 				ALLOCATE_POSTR_STRING(postreq->thread, value);
 				break;
 			case HASH_MESSAGE:
-				ALLOCATE_POSTR_STRING(postreq->message, value);
+				{
+					printf("pre: %s\n", value);
+					char *esc1 = escape(value, ">", "&gt;");
+					char *esc2 = escape(esc1, "<", "&lt;");
+					char *esc3 = escape(esc2, "\"", "&quot;");
+					ALLOCATE_POSTR_STRING(postreq->message, esc3);
+					free(esc1);
+					free(esc2);
+					free(esc3);
+				}
 				break;
 			case HASH_NAME:
 				ALLOCATE_POSTR_STRING(postreq->name, value);
@@ -396,17 +431,7 @@ void respond(int n)
 		if ( strncmp(reqline[0], "POST\0", 5)==0 ) {
 			printf("info: you got mail\n");
 
-			char proper[STRLEN];
-			urldecode(proper, mesg3);
-
-			int illegal = 0;
-			for(size_t i = 0; i < STRLEN; i++)
-				if(proper[i] == '<'){
-					illegal = 1;
-					break;
-				}
-
-			if( illegal || ( strncmp( reqline[2], "HTTP/1.0", 8)!=0 && strncmp( reqline[2], "HTTP/1.1", 8)!=0 ))
+			if(strncmp( reqline[2], "HTTP/1.0", 8)!=0 && strncmp( reqline[2], "HTTP/1.1", 8)!=0)
 			{
 				printf("info: Bad request!\n");
 				WRITE(clients[n], "HTTP/1.0 400 Bad Request\n\n");
@@ -426,7 +451,7 @@ void respond(int n)
 				urldecode(bigdump, last);
 				struct POSTR postreq = {NULL};
 				getpostreqs(bigdump, &postreq);
-				printf("info: thread[%s] name:[%s], message:[%s] img:[%s]\n", postreq.thread, postreq.name, postreq.message, postreq.img);
+				/*printf("info: thread[%s] name:[%s], message:[%s] img:[%s]\n", postreq.thread, postreq.name, postreq.message, postreq.img);*/
 				if(!postreq.message || !postreq.name || !postreq.img){
 					printf("warn: missing post args, message, name and img required\n");
 					WRITE(clients[n], "HTTP/1.0 400 Bad Request\n\n");
@@ -441,7 +466,7 @@ void respond(int n)
 					strncpy(reqline1raw, &reqline[1][1], 100);
 					urldecode(reqline1, reqline1raw);
 					ALLOCATE_POSTR_STRING(postreq.thread, reqline1);
-					printf("warn: no thread name, set to %s\n", postreq.thread);
+					printf("info: no thread name, set to %s\n", postreq.thread);
 				}
 
 				if(strlen(postreq.thread) < 4){
@@ -493,15 +518,11 @@ void respond(int n)
 					printf("appending to [%s]\n", path);
 					FILE *fptr = fopen(path, "a");
 					fprintf(fptr, "<hr><div class=\"post\"><span class=\"titlebar\"><span class=\"author\">%s</span> <time class=\"posttime\">%s</time></span><br>", postreq.name, timed);
-					printf("1all good\n");
 					if(postreq.img && strlen(postreq.img) > 1){
 						fprintf(fptr, "<a href=\"%s\"><img src=\"%s\" /></a><br>", postreq.img, postreq.img);
 					}
-					printf("2all good\n");
 					fprintf(fptr, "<div class=\"postcontent\">");
-					printf("3all good\n");
 					char *token = strtok(postreq.message, "\n");
-					printf("4all good\n");
 					while(token != NULL){
 						// remove leading whitespace
 						while(*token == ' ')
@@ -514,8 +535,8 @@ void respond(int n)
 						token = strtok(NULL, "\n");
 					}
 					fprintf(fptr, "</div></div>\n\n");
-					printf("closed file\n");
 					fclose(fptr);
+					printf("closed file\n");
 
 					WRITE(clients[n], "HTTP/1.0 303 See Other\nLocation: ");
 					WRITE(clients[n], &reqline[1][1]);
