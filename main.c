@@ -214,10 +214,12 @@ struct POSTR{
 		free(postr.img);
 
 #define ALLOCATE_POSTR_STRING(ptr, val)			\
+{							\
 if(ptr)							\
 	free(ptr);					\
 ptr = (char *)malloc(sizeof(char) * (strlen(val)+1));	\
-strcpy(ptr, val);
+strcpy(ptr, val);					\
+}
 
 void getpostreqs(char *msg, struct POSTR *postreq){
 	char *a = msg;
