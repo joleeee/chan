@@ -527,7 +527,7 @@ void respond(int n)
 						// remove leading whitespace
 						while(*token == ' ')
 							token++;
-						int green = *token == '>';
+						int green = strncmp(token, "&gt;", 4) == 0;
 						fprintf(fptr, "%s%s%s<br>",
 								green?"<span class=\"greentext\">":"",
 								token,
