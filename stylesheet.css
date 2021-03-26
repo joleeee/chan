@@ -31,3 +31,9 @@ body{
 	background-color: #f0e8e3;
 	padding: 1px 6px 1px 6px;
 }
+
+.banner{
+	display: block;
+	margin-left: auto;
+	margin-right: auto;
+}
