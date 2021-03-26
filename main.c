@@ -30,6 +30,8 @@ starts the server at port 10000 with ROOT as /home/shadyabhi
 #include<dirent.h>
 #include<time.h>
 
+#include"str.c"
+
 #define WRITE(client, string) write(client, string, strlen(string))
 
 #define CONNMAX 1000
@@ -37,66 +39,6 @@ starts the server at port 10000 with ROOT as /home/shadyabhi
 #define BYTES 1024
 
 #define STRLEN 99999
-
-// https://www.geeksforgeeks.org/c-program-replace-word-text-another-given-word/
-char *escape(char *str, char *find, char *rep){
-	char *result;
-	int i, cnt=0;
-	int findlen = strlen(find);
-	int replen = strlen(rep);
-	for(i=0; str[i] != '\0'; i++){
-		if(strstr(&str[i], find) == &str[i]){
-			cnt++;
-			i += findlen-1;
-		}
-	}
-
-	result = (char*)malloc(i + cnt*(replen-findlen) + 1);
-
-	i=0;
-	while(*str){
-		if(strstr(str, find) == str){
-			strcpy(&result[i], rep);
-			i+=replen;
-			str+=findlen;
-		}
-		else
-			result[i++]=*str++;
-	}
-	result[i] = '\0';
-	return result;
-}
-
-void urldecode(char *dst, const char *src)
-{
-        char a, b;
-        while (*src) {
-                if ((*src == '%') &&
-                    ((a = src[1]) && (b = src[2])) &&
-                    (isxdigit(a) && isxdigit(b))) {
-                        if (a >= 'a')
-                                a -= 'a'-'A';
-                        if (a >= 'A')
-                                a -= ('A' - 10);
-                        else
-                                a -= '0';
-                        if (b >= 'a')
-                                b -= 'a'-'A';
-                        if (b >= 'A')
-                                b -= ('A' - 10);
-                        else
-                                b -= '0';
-                        *dst++ = 16*a+b;
-                        src+=3;
-                } else if (*src == '+') {
-                        *dst++ = ' ';
-                        src++;
-                } else {
-                        *dst++ = *src++;
-                }
-        }
-        *dst++ = '\0';
-}
 
 char *ROOT;
 int listenfd, clients[CONNMAX];
@@ -252,18 +194,6 @@ void sendfiles(int n, int argc, ...){
 	va_end(valist2);
 }
 
-// http://www.cse.yorku.ca/~oz/hash.html
-const unsigned long hash(const unsigned char *str)
-{
-    unsigned long hash = 5381;
-    int c;
-
-    while (c = *str++)
-        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
-
-    return hash;
-}
-
 #define HASH_THREAD 6954056392669
 #define HASH_NAME 6385503302
 #define HASH_MESSAGE 229474704965354
@@ -335,7 +265,8 @@ void getpostreqs(char *msg, struct POSTR *postreq){
 				}
 				break;
 			case HASH_NAME:
-				ALLOCATE_POSTR_STRING(postreq->name, value);
+				if(isalphanumerical(value))
+					ALLOCATE_POSTR_STRING(postreq->name, value);
 				break;
 			case HASH_IMG:
 				ALLOCATE_POSTR_STRING(postreq->img, value);
@@ -344,6 +275,8 @@ void getpostreqs(char *msg, struct POSTR *postreq){
 				printf("err %s = %ld not recognized\n", key, hash(key));
 				break;
 		}
+end:
+		;
 	}
 }
 
