@@ -330,6 +330,8 @@ void respond(int n)
 					sendfile(n, "/precatalog.html");
 
 					DIR *dir;
+					int listc=0;
+					char list[100][100];
 					// ->d_type != DT_REG
 					if(dir = opendir(ROOT)){
 						struct dirent *files;
@@ -344,19 +346,37 @@ void respond(int n)
 								stat(files->d_name, &attrib);
 								char date[30];
 								strftime(date, 30, "%Y-%m-%d %H:%M UTC", gmtime(&(attrib.st_ctime)));
-
-								WRITE(clients[n], "<a href=\"");
-								WRITE(clients[n], files->d_name);
-								WRITE(clients[n], "\">");
-								WRITE(clients[n], "<time class=\"posttime\">");
-								WRITE(clients[n], date);
-								WRITE(clients[n], "</time>");
-								WRITE(clients[n], " ");
-								WRITE(clients[n], files->d_name);
-								WRITE(clients[n], "</a><br>");
+								if(listc < 100){
+									strncpy(list[listc], date, 30);
+									int idx = strlen(date);
+									strncpy(&list[listc][idx], "+", 1);
+									strncpy(&list[listc][idx+1], files->d_name, 68);
+									listc++;
+								}
 							}
 						}
 					}
+					char** slist = malloc(sizeof(char*) * listc);
+					for(int i = 0; i < listc; i++)
+						slist[i] = (char*)&list[i];
+
+					qsort(slist, listc, sizeof(char *), revcmpstr);
+
+					for(int i = 0; i < listc; i++){
+						char* date = strtok(slist[i], "+");
+						char* name = strtok(NULL, "\0");
+						WRITE(clients[n], "<a href=\"");
+						WRITE(clients[n], name);
+						WRITE(clients[n], "\">");
+						WRITE(clients[n], "<time class=\"posttime\">");
+						WRITE(clients[n], date);
+						WRITE(clients[n], "</time>");
+						WRITE(clients[n], " ");
+						WRITE(clients[n], name);
+						WRITE(clients[n], "</a><br>");
+					}
+					free(slist);
+
 					sendfile(n, "/postcatalog.html");
 				}
 				else{

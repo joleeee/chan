@@ -1,3 +1,11 @@
+int cmpstr(const void* a, const void* b) {
+	return strcmp(*(const char**)a, *(const char**)b);
+}
+
+int revcmpstr(const void* a, const void* b) {
+	return strcmp(*(const char**)b, *(const char**)a);
+}
+
 int isalphanumerical(char *s){
 	while(*s){
 		if(!(*s >= 'A' && *s <= 'Z' || *s >= 'a' && *s <= 'z' || *s >= '0' && *s <= '9'))
