@@ -370,7 +370,7 @@ void respond(int n)
 			{
 				printf("info: Bad request!\n");
 				WRITE(clients[n], "HTTP/1.0 400 Bad Request\n\n");
-				WRITE(clients[n], "XSS is not permitted! >:)\n");
+				goto done;
 			}
 			else
 			{
@@ -392,11 +392,9 @@ void respond(int n)
 					printf("message: %d | name: %d | img: %d\n", !!postreq.message, !!postreq.name, !!postreq.img);
 					WRITE(clients[n], "HTTP/1.0 400 Bad Request\n\n");
 					WRITE(clients[n], ">:)\n");
-					shutdown (clients[n], SHUT_RDWR);         //All further send and recieve operations are DISABLED...
-					close(clients[n]);
-					clients[n]=-1;
-					return;
+					goto done;
 				}
+
 				if(!postreq.thread){
 					char reqline1raw[100], reqline1[100];
 					strncpy(reqline1raw, &reqline[1][1], 100);
@@ -409,10 +407,7 @@ void respond(int n)
 					printf("warn: too short");
 					WRITE(clients[n], "HTTP/1.0 400 Bad Request\n\n");
 					WRITE(clients[n], "Too short thread name, at least 4 characters required");
-					shutdown (clients[n], SHUT_RDWR);         //All further send and recieve operations are DISABLED...
-					close(clients[n]);
-					clients[n]=-1;
-					return;
+					goto done;
 				}
 
 				// now postreq.* are all set to at least ""
@@ -430,63 +425,67 @@ void respond(int n)
 					printf("warn: msg empty");
 					WRITE(clients[n], "HTTP/1.0 400 Bad Request\n\n");
 					WRITE(clients[n], "You have to say something!\n");
-				}
-				else
-				{
-					time_t rawtime;
-					struct tm *timeinfo;
-					time(&rawtime);
-					timeinfo=gmtime(&rawtime);
-					char timed[10000];
-					sprintf(timed, "%04d-%02d-%02d %02d:%02d:%02d UTC",
-							timeinfo->tm_year+1900,
-							timeinfo->tm_mon+1,
-							timeinfo->tm_mday,
-							timeinfo->tm_hour,
-							timeinfo->tm_min,
-							timeinfo->tm_sec);
-
-					strcpy(path, ROOT);
-					strcpy(&path[strlen(ROOT)], "/\0");
-					strcpy(&path[strlen(ROOT)+1], postreq.thread);
-
-					// RACE CONDITION!!!! (me thinks)
-					printf("appending to [%s]\n", path);
-					FILE *fptr = fopen(path, "a");
-					fprintf(fptr, "<hr><div class=\"post\"><span class=\"titlebar\"><span class=\"author\">%s</span> <time class=\"posttime\">%s</time></span><br>", postreq.name, timed);
-					if(postreq.img && strlen(postreq.img) > 1){
-						fprintf(fptr, "<a href=\"%s\"><img src=\"%s\" /></a><br>", postreq.img, postreq.img);
-					}
-					fprintf(fptr, "<div class=\"postcontent\">");
-					char *token = strtok(postreq.message, "\n");
-					while(token != NULL){
-						// remove leading whitespace
-						while(*token == ' ')
-							token++;
-						int green = strncmp(token, "&gt;", 4) == 0;
-						int pink = strncmp(token, "&lt;", 4) == 0;
-						fprintf(fptr, "%s%s%s<br>",
-								(pink||green)?green?"<span class=\"greentext\">":"<span class=\"pinktext\">":"",
-								token,
-								(pink||green)?"</span>":"");
-						token = strtok(NULL, "\n");
-					}
-					fprintf(fptr, "</div></div>\n\n");
-					fclose(fptr);
-					printf("closed file\n");
-
-					WRITE(clients[n], "HTTP/1.0 303 See Other\nLocation: ");
-					WRITE(clients[n], &reqline[1][1]);
-					WRITE(clients[n], "\n\n");
-
-					printf("info: Redirecting to %s\n", reqline[1]);
+					goto done;
 				}
 
+				time_t rawtime;
+				struct tm *timeinfo;
+				time(&rawtime);
+				timeinfo=gmtime(&rawtime);
+				char timed[10000];
+				sprintf(timed, "%04d-%02d-%02d %02d:%02d:%02d UTC",
+						timeinfo->tm_year+1900,
+						timeinfo->tm_mon+1,
+						timeinfo->tm_mday,
+						timeinfo->tm_hour,
+						timeinfo->tm_min,
+						timeinfo->tm_sec);
+
+				strcpy(path, ROOT);
+				strcpy(&path[strlen(ROOT)], "/\0");
+				strcpy(&path[strlen(ROOT)+1], postreq.thread);
+
+				// RACE CONDITION!!!! (me thinks)
+				printf("appending to [%s]\n", path);
+				FILE *fptr = fopen(path, "a");
+				fprintf(fptr, "<hr><div class=\"post\"><span class=\"titlebar\"><span class=\"author\">%s</span> <time class=\"posttime\">%s</time></span><br>", postreq.name, timed);
+				if(postreq.img && strlen(postreq.img) > 1){
+					fprintf(fptr, "<a href=\"%s\"><img src=\"%s\" /></a><br>", postreq.img, postreq.img);
+				}
+				fprintf(fptr, "<div class=\"postcontent\">");
+				char *token = strtok(postreq.message, "\n");
+				while(token != NULL){
+					// remove leading whitespace
+					while(*token == ' ')
+						token++;
+					int green = strncmp(token, "&gt;", 4) == 0;
+					int pink = strncmp(token, "&lt;", 4) == 0;
+					fprintf(fptr, "%s%s%s<br>",
+							(pink||green)?green?"<span class=\"greentext\">":"<span class=\"pinktext\">":"",
+							token,
+							(pink||green)?"</span>":"");
+					token = strtok(NULL, "\n");
+				}
+				fprintf(fptr, "</div></div>\n\n");
+				fclose(fptr);
+				printf("closed file\n");
+
+				WRITE(clients[n], "HTTP/1.0 303 See Other\nLocation: ");
+				WRITE(clients[n], &reqline[1][1]);
+				WRITE(clients[n], "\n\n");
+
+				printf("info: Redirecting to %s\n", reqline[1]);
+
+
+
+
+
+				//free postr and close sockets
+done:
 				FREE_POSTR(&postreq);
 			}
 		}
 	}
-
 	//Closing SOCKET
 	shutdown (clients[n], SHUT_RDWR);         //All further send and recieve operations are DISABLED...
 	close(clients[n]);
