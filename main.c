@@ -362,18 +362,13 @@ void respond(int n)
 
 					qsort(slist, listc, sizeof(char *), revcmpstr);
 
+					char buff[1000];
 					for(int i = 0; i < listc; i++){
 						char* date = strtok(slist[i], "+");
 						char* name = strtok(NULL, "\0");
-						WRITE(clients[n], "<a href=\"");
-						WRITE(clients[n], name);
-						WRITE(clients[n], "\">");
-						WRITE(clients[n], "<time class=\"posttime\">");
-						WRITE(clients[n], date);
-						WRITE(clients[n], "</time>");
-						WRITE(clients[n], " ");
-						WRITE(clients[n], name);
-						WRITE(clients[n], "</a><br>");
+						snprintf(buff, 1000,
+								"<a href=\"%s\"><time class=\"posttime\">%s</time> %s</a><br>", name, date, name);
+						WRITE(clients[n], buff);
 					}
 					free(slist);
 
