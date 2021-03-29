@@ -203,22 +203,23 @@ struct POSTR{
 	char *thread, *message, *name, *img;
 };
 
-#define FREE_POSTR(postr)		\
-	if(postr.thread)		\
-		free(postr.thread);	\
-	if(postr.message)		\
-		free(postr.message);	\
-	if(postr.name)			\
-		free(postr.name);	\
-	if(postr.img)			\
-		free(postr.img);
+void FREE_POSTR(struct POSTR *postr){
+	if(postr->thread)
+		free(postr->thread);
+	if(postr->message)
+		free(postr->message);
+	if(postr->name)
+		free(postr->name);
+	if(postr->img)
+		free(postr->img);
+}
 
-#define ALLOCATE_POSTR_STRING(ptr, val)			\
-{							\
-if(ptr)							\
-	free(ptr);					\
-ptr = (char *)malloc(sizeof(char) * (strlen(val)+1));	\
-strcpy(ptr, val);					\
+void COPY_STRING(char** optr, char* val){
+	char* ptr = *optr;
+	if(ptr)
+		free(ptr);
+	ptr = strdup(val);
+	*optr = ptr;
 }
 
 void getpostreqs(char *msg, struct POSTR *postreq){
@@ -252,15 +253,14 @@ void getpostreqs(char *msg, struct POSTR *postreq){
 
 		switch(hash(key)){
 			case HASH_THREAD:
-				ALLOCATE_POSTR_STRING(postreq->thread, value);
+				COPY_STRING(&postreq->thread, value);
 				break;
 			case HASH_MESSAGE:
 				{
-					printf("pre: %s\n", value);
 					char *esc1 = escape(value, ">", "&gt;");
 					char *esc2 = escape(esc1, "<", "&lt;");
 					char *esc3 = escape(esc2, "\"", "&quot;");
-					ALLOCATE_POSTR_STRING(postreq->message, esc3);
+					COPY_STRING(&postreq->message, esc3);
 					free(esc1);
 					free(esc2);
 					free(esc3);
@@ -268,10 +268,10 @@ void getpostreqs(char *msg, struct POSTR *postreq){
 				break;
 			case HASH_NAME:
 				if(isalphanumerical(value))
-					ALLOCATE_POSTR_STRING(postreq->name, value);
+					COPY_STRING(&postreq->name, value);
 				break;
 			case HASH_IMG:
-				ALLOCATE_POSTR_STRING(postreq->img, value);
+				COPY_STRING(&postreq->img, value);
 				break;
 			default:
 				printf("err %s = %ld not recognized\n", key, hash(key));
@@ -387,8 +387,9 @@ void respond(int n)
 				struct POSTR postreq = {NULL};
 				getpostreqs(bigdump, &postreq);
 				/*printf("info: thread[%s] name:[%s], message:[%s] img:[%s]\n", postreq.thread, postreq.name, postreq.message, postreq.img);*/
-				if(!postreq.message || !postreq.name || !postreq.img){
+				if(!postreq.message || !postreq.name){
 					printf("warn: missing post args, message, name and img required\n");
+					printf("message: %d | name: %d | img: %d\n", !!postreq.message, !!postreq.name, !!postreq.img);
 					WRITE(clients[n], "HTTP/1.0 400 Bad Request\n\n");
 					WRITE(clients[n], ">:)\n");
 					shutdown (clients[n], SHUT_RDWR);         //All further send and recieve operations are DISABLED...
@@ -400,7 +401,7 @@ void respond(int n)
 					char reqline1raw[100], reqline1[100];
 					strncpy(reqline1raw, &reqline[1][1], 100);
 					urldecode(reqline1, reqline1raw);
-					ALLOCATE_POSTR_STRING(postreq.thread, reqline1);
+					COPY_STRING(&postreq.thread, reqline1);
 					printf("info: no thread name, set to %s\n", postreq.thread);
 				}
 
@@ -417,7 +418,7 @@ void respond(int n)
 				// now postreq.* are all set to at least ""
 
 				if(strlen(postreq.name) < 1){
-					ALLOCATE_POSTR_STRING(postreq.name, "Ola");
+					COPY_STRING(&postreq.name, "Ola");
 				}
 
 				if(strlen(postreq.thread) < strlen("a.thread") || strlen(postreq.thread) >= strlen("a.thread") && strncmp(&postreq.thread[strlen(postreq.thread)-strlen(".thread")], ".thread", strlen(".thread")) != 0){
@@ -481,7 +482,7 @@ void respond(int n)
 					printf("info: Redirecting to %s\n", reqline[1]);
 				}
 
-				FREE_POSTR(postreq);
+				FREE_POSTR(&postreq);
 			}
 		}
 	}
