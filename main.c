@@ -491,4 +491,3 @@ done:
 	close(clients[n]);
 	clients[n]=-1;
 }
-
