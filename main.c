@@ -342,13 +342,15 @@ void respond(int n)
 								struct stat attrib;
 								// TODO NEED TO PREPEND ROOT
 								stat(files->d_name, &attrib);
-								char date[20];
-								strftime(date, 20, "%m-%d %H:%M", gmtime(&(attrib.st_ctime)));
+								char date[30];
+								strftime(date, 30, "%Y-%m-%d %H:%M UTC", gmtime(&(attrib.st_ctime)));
 
 								WRITE(clients[n], "<a href=\"");
 								WRITE(clients[n], files->d_name);
 								WRITE(clients[n], "\">");
+								WRITE(clients[n], "<time class=\"posttime\">");
 								WRITE(clients[n], date);
+								WRITE(clients[n], "</time>");
 								WRITE(clients[n], " ");
 								WRITE(clients[n], files->d_name);
 								WRITE(clients[n], "</a><br>");

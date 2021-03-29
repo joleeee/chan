@@ -17,6 +17,9 @@ function localize(){
 	for (var i=0, max=all.length; i < max; i++) {
 	  var o = all[i].innerHTML.replace(/-/g, "/")
 	  var t = new Date(o);
-	  all[i].innerHTML=t.today() + " " + t.timeNow() + " <small>(" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")</small>";
+	  //var zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+	  var d = new Date()
+	  var zone = d.toLocaleString('en', {timeZoneName: 'short'}).split(' ').pop();
+	  all[i].innerHTML=t.today() + " " + t.timeNow() + " <small>(" + zone + ")</small>";
 	}
 }
